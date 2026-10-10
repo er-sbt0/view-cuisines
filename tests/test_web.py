@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from starlette.datastructures import FormData
 
 from app.db import Repository
-from app.forms import format_quantity, parse_quantity, parse_recipe_form, parse_tags
+from app.forms import format_quantity, parse_int, parse_quantity, parse_recipe_form, parse_tags
 from app.llm.base import ExtractionError, ExtractionRefused, NotARecipeError
 from app.llm.fake import FakeProvider
 from app.main import create_app
@@ -288,11 +288,20 @@ def test_parse_form_ragged_ingredient_lists():
 
 @pytest.mark.parametrize(
     ("text", "expected"),
-    [("2", 2.0), ("0.5", 0.5), ("1,5", 1.5), ("1/2", 0.5), ("½", 0.5), ("1 1/2", 1.5),
+    [("2", 2.0), ("0.5", 0.5), ("1,5", 1.5), ("1,25", 1.25), ("0,500", 0.5), ("1,500", 1500.0),
+     ("12,000", 12000.0), ("1,500.5", 1500.5), ("1,50,0", None), ("1/2", 0.5), ("½", 0.5), ("1 1/2", 1.5),
      ("1½", 1.5), ("", None), ("  ", None), ("קצת", None), ("1/0", None), ("0", None)],
 )
 def test_parse_quantity(text: str, expected: float | None):
     assert parse_quantity(text) == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [("4", 4), ("1,500", 1500), ("1,5", 1), ("", None), ("-3", None), ("כמה", None)],
+)
+def test_parse_int(text: str, expected: int | None):
+    assert parse_int(text) == expected
 
 
 @pytest.mark.parametrize(

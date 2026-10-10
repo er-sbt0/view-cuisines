@@ -17,6 +17,8 @@ _UNICODE_FRACTIONS = {
 }
 _DISPLAY_FRACTIONS = {v: k for k, v in _UNICODE_FRACTIONS.items()}
 _TAG_SEPARATORS = re.compile(r"[,،;]")
+# '1,500' / '12,000.5': commas grouping thousands, as opposed to a decimal comma ('1,5', '0,500').
+_THOUSANDS = re.compile(r"[1-9]\d{0,2}(?:,\d{3})+(?:\.\d+)?")
 
 
 def _text(value: object) -> str | None:
@@ -24,8 +26,15 @@ def _text(value: object) -> str | None:
     return text or None
 
 
+def _decimal(text: str) -> str:
+    """Normalize a number's comma: thousands separator is dropped, decimal comma becomes a point."""
+    if _THOUSANDS.fullmatch(text):
+        return text.replace(",", "")
+    return text.replace(",", ".")
+
+
 def parse_quantity(value: object) -> float | None:
-    """'2', '0.5', '1,5', '1/2', '½', '1 1/2', '1½' -> float. Anything else -> None."""
+    """'2', '0.5', '1,5', '1,500', '1/2', '½', '1 1/2', '1½' -> float. Anything else -> None."""
     text = _text(value)
     if text is None:
         return None
@@ -40,7 +49,7 @@ def parse_quantity(value: object) -> float | None:
                 num, den = part.split("/", 1)
                 total += Fraction(int(num), int(den))
             else:
-                total += Fraction(part.replace(",", "."))
+                total += Fraction(_decimal(part))
     except (ValueError, ZeroDivisionError):
         return None
     return float(total) if total > 0 else None
@@ -52,7 +61,7 @@ def parse_int(value: object) -> int | None:
     if text is None:
         return None
     try:
-        number = int(float(text.replace(",", ".")))
+        number = int(float(_decimal(text)))
     except ValueError:
         return None
     return number if number >= 0 else None
