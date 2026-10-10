@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="catalog-wrap" hx-target="#catalog" hx-push-url="true">
+  <form class="search" action="/" method="get" role="search"
+        hx-get="/" hx-include="[data-catalog-state]">
+    <label class="visually-hidden" for="q">חיפוש מתכונים</label>
+    <input id="q" type="search" name="q" value="{{ q }}" autocomplete="off"
+           placeholder="חיפוש לפי שם, מרכיב או תגית…"
+           hx-get="/" hx-trigger="input changed delay:300ms, search"
+           hx-include="[data-catalog-state]">
+  </form>
+  <div id="catalog">
+    {% include "partials/catalog.html" %}
+  </div>
+</div>
+{% endblock %}

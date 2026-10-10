@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}{{ recipe.title }} · המתכונים שלי{% endblock %}
+{% block content %}
+<article class="recipe">
+  <header class="recipe-header">
+    <h1>{{ recipe.title }}</h1>
+    {% if recipe.description %}<p class="lead">{{ recipe.description }}</p>{% endif %}
+    <p class="meta">
+      <a href="{{ catalog_url(cuisine=recipe.cuisine) }}">{{ recipe.cuisine }}</a>
+      <a href="{{ catalog_url(meal_type=recipe.meal_type) }}">{{ recipe.meal_type }}</a>
+      {% if recipe.servings %}<span>{{ recipe.servings }} מנות</span>{% endif %}
+      {% if recipe.prep_minutes %}<span>הכנה: {{ recipe.prep_minutes|minutes }}</span>{% endif %}
+      {% if recipe.cook_minutes %}<span>בישול: {{ recipe.cook_minutes|minutes }}</span>{% endif %}
+      {% set total = total_minutes(recipe) %}
+      {% if total and recipe.prep_minutes and recipe.cook_minutes %}<span>סה״כ: {{ total|minutes }}</span>{% endif %}
+    </p>
+    {% if recipe.tags %}
+    <p class="tags">{% for t in recipe.tags %}<a class="tag" href="{{ catalog_url(tag=t) }}">#{{ t }}</a> {% endfor %}</p>
+    {% endif %}
+  </header>
+
+  {% if recipe.ingredients %}
+  <section>
+    <h2>מרכיבים</h2>
+    <ul class="ingredients">
+      {% for ing in recipe.ingredients %}
+      <li>
+        {%- if ing.quantity is not none or ing.unit %}<span class="qty">{% if ing.quantity is not none %}<bdi dir="ltr">{{ ing.quantity|qty }}</bdi> {% endif %}{{ ing.unit or "" }}</span> {% endif -%}
+        {{ ing.item }}{% if ing.note %}<span class="note">, {{ ing.note }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if recipe.steps %}
+  <section>
+    <h2>אופן ההכנה</h2>
+    <ol class="steps">
+      {% for step in recipe.steps %}<li>{{ step }}</li>{% endfor %}
+    </ol>
+  </section>
+  {% endif %}
+
+  {% if recipe.tips %}
+  <section>
+    <h2>טיפים</h2>
+    <ul class="tips">
+      {% for tip in recipe.tips %}<li>{{ tip }}</li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  <footer class="recipe-actions no-print">
+    <a class="button" href="/recipes/{{ recipe.id }}/edit">עריכה</a>
+    <button type="button" class="button" data-print>הדפסה</button>
+    <form method="post" action="/recipes/{{ recipe.id }}/reextract"
+          hx-post="/recipes/{{ recipe.id }}/reextract" hx-target="#page"
+          hx-indicator="#reextract-spinner" hx-disabled-elt="find button">
+      <button type="submit" class="button" title="להריץ שוב את החילוץ על הטקסט המקורי">חילוץ מחדש</button>
+    </form>
+    <form method="post" action="/recipes/{{ recipe.id }}/delete"
+          hx-post="/recipes/{{ recipe.id }}/delete"
+          hx-confirm="למחוק את המתכון „{{ recipe.title }}”? לא ניתן לבטל פעולה זו.">
+      <button type="submit" class="button button-danger">מחיקה</button>
+    </form>
+    <span id="reextract-spinner" class="htmx-indicator spinner-wrap" aria-live="polite">
+      <span class="spinner" aria-hidden="true"></span> מחלץ מחדש…
+    </span>
+  </footer>
+</article>
+{% endblock %}

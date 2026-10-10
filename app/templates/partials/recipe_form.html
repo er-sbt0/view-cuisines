@@ -1,0 +1,84 @@
+{# Review/edit form shared by new (action=/recipes) and existing recipes (action=/recipes/<id>). #}
+{% set is_new = action == "/recipes" %}
+<h1>{{ "בדיקת המתכון לפני שמירה" if is_new else "עריכת מתכון" }}</h1>
+{% if is_new %}<p class="lead">זה מה שחולץ מהטקסט. תקנו מה שצריך ושמרו.</p>{% endif %}
+{% if error %}<div class="alert" role="alert">{{ error }}</div>{% endif %}
+
+<form class="recipe-form" method="post" action="{{ action }}">
+  <input type="hidden" name="source_text" value="{{ source_text }}">
+
+  <div class="field">
+    <label for="title">שם המתכון</label>
+    <input id="title" name="title" value="{{ draft.title }}" required>
+  </div>
+  <div class="field">
+    <label for="description">תיאור</label>
+    <textarea id="description" name="description" rows="2">{{ draft.description or "" }}</textarea>
+  </div>
+
+  <div class="field-grid">
+    <div class="field">
+      <label for="cuisine">מטבח</label>
+      <select id="cuisine" name="cuisine">
+        {% for c in taxonomy.cuisines %}<option{% if c == draft.cuisine %} selected{% endif %}>{{ c }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="meal_type">סוג מנה</label>
+      <select id="meal_type" name="meal_type">
+        {% for m in taxonomy.meal_types %}<option{% if m == draft.meal_type %} selected{% endif %}>{{ m }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="servings">מנות</label>
+      <input id="servings" name="servings" type="number" min="0" inputmode="numeric" value="{{ draft.servings if draft.servings is not none else '' }}">
+    </div>
+    <div class="field">
+      <label for="prep_minutes">הכנה (דקות)</label>
+      <input id="prep_minutes" name="prep_minutes" type="number" min="0" inputmode="numeric" value="{{ draft.prep_minutes if draft.prep_minutes is not none else '' }}">
+    </div>
+    <div class="field">
+      <label for="cook_minutes">בישול / אפייה (דקות)</label>
+      <input id="cook_minutes" name="cook_minutes" type="number" min="0" inputmode="numeric" value="{{ draft.cook_minutes if draft.cook_minutes is not none else '' }}">
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="tags">תגיות <span class="hint">(מופרדות בפסיקים)</span></label>
+    <input id="tags" name="tags" value="{{ draft.tags|join(', ') }}">
+  </div>
+
+  <fieldset class="field">
+    <legend>מרכיבים</legend>
+    <div class="ingredient-head" aria-hidden="true">
+      <span>כמות</span><span>יחידה</span><span>מרכיב</span><span>הערה</span><span></span>
+    </div>
+    <div id="ingredients" class="ingredients-edit">
+      {% for ing in draft.ingredients %}{% include "partials/ingredient_row.html" %}{% endfor %}
+      {% if not draft.ingredients %}{% with ing = none %}{% include "partials/ingredient_row.html" %}{% endwith %}{% endif %}
+    </div>
+    <template id="ingredient-row-template">{% with ing = none %}{% include "partials/ingredient_row.html" %}{% endwith %}</template>
+    <button type="button" class="button button-small" data-add-row>+ הוספת מרכיב</button>
+  </fieldset>
+
+  <div class="field">
+    <label for="steps">שלבי הכנה <span class="hint">(שלב בכל שורה)</span></label>
+    <textarea id="steps" name="steps" rows="{{ [draft.steps|length + 2, 6]|max }}">{{ draft.steps|join('\n') }}</textarea>
+  </div>
+  <div class="field">
+    <label for="tips">טיפים <span class="hint">(טיפ בכל שורה)</span></label>
+    <textarea id="tips" name="tips" rows="{{ [draft.tips|length + 1, 3]|max }}">{{ draft.tips|join('\n') }}</textarea>
+  </div>
+
+  {% if source_text %}
+  <details class="source">
+    <summary>הטקסט המקורי</summary>
+    <pre>{{ source_text }}</pre>
+  </details>
+  {% endif %}
+
+  <div class="form-actions">
+    <button type="submit" class="button button-primary">שמירת מתכון</button>
+    <a class="button" href="{{ '/new' if is_new else action }}">ביטול</a>
+  </div>
+</form>

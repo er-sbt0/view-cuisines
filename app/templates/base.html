@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>{% block title %}המתכונים שלי{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <nav class="container nav" aria-label="ניווט ראשי">
+      <a class="brand" href="/">המתכונים שלי</a>
+      <a class="button button-primary" href="/new">+ מתכון חדש</a>
+    </nav>
+  </header>
+  <main id="page" class="container">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

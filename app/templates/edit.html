@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block title %}{{ draft.title or "מתכון" }} · עריכה{% endblock %}
+{% block content %}
+{% include "partials/recipe_form.html" %}
+{% endblock %}

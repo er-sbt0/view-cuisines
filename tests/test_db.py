@@ -75,7 +75,9 @@ def test_fts_finds_hebrew_ingredient(repo: Repository):
 
 
 @pytest.mark.parametrize(
-    "query", ['"', "*", "OR", "AND", "NOT", "חומוס OR", '"חומוס', "(", "-", "a:b", "^", "  ", ""]
+    "query",
+    ['"', '"""', "***", "%_%", "\\", "*", "OR", "AND", "NOT", "חומוס OR", '"חומוס',
+     "(", "-", "a:b", "^", "  ", ""],
 )
 def test_fts_survives_odd_input(repo: Repository, query: str):
     repo.create(make_draft(), "")
@@ -92,3 +94,41 @@ def test_fts_tracks_update_and_delete(repo: Repository):
     repo.delete(r.id)
     assert repo.list(query="עגבניות") == []
     assert repo.list(query="שקשוקה") == []
+
+
+def test_fts_matches_hebrew_prefixed_words(repo: Repository):
+    r = repo.create(
+        make_draft(title="סלט", description="מגישים עם החומוס וטחינה", tags=[],
+                   ingredients=[Ingredient(item="וחומוס")]),
+        "",
+    )
+    assert [x.id for x in repo.list(query="חומוס")] == [r.id]
+    assert [x.id for x in repo.list(query="טחינה")] == [r.id]
+
+
+def test_fts_short_terms_fall_back_to_substring(repo: Repository):
+    r = repo.create(make_draft(title="פו מרק", description=None, tags=[]), "")
+    repo.create(make_draft(title="פסטה", description=None, tags=[],
+                           ingredients=[Ingredient(item="ספגטי")]), "")
+    assert [x.id for x in repo.list(query="פו")] == [r.id]
+    assert [x.id for x in repo.list(query="פו חומוס")] == [r.id]  # short + long, ANDed
+    assert repo.list(query="%") == []  # LIKE wildcards are escaped
+    assert repo.list(query="_") == []
+
+
+def test_existing_unicode61_fts_is_rebuilt_as_trigram(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "old.db"
+    r = Repository(path)
+    created = r.create(make_draft(description="עם החומוס"), "")
+    r.close()
+    conn = sqlite3.connect(path)
+    conn.execute("DROP TABLE recipes_fts")
+    conn.execute("CREATE VIRTUAL TABLE recipes_fts USING fts5(title, description, ingredients, tags)")
+    conn.commit()
+    conn.close()
+
+    r = Repository(path)
+    assert [x.id for x in r.list(query="חומוס")] == [created.id]
+    r.close()

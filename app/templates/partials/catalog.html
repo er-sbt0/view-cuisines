@@ -1,0 +1,69 @@
+{# Swapped into #catalog by HTMX; links inherit hx-target/hx-push-url from .catalog-wrap. #}
+{% macro filter_link(url, label, active=false, cls="chip") -%}
+<a href="{{ url }}" hx-get="{{ url }}" class="{{ cls }}{% if active %} is-active{% endif %}"
+   {%- if active %} aria-current="true"{% endif %}>{{ label }}</a>
+{%- endmacro %}
+
+{% for name in ("cuisine", "meal_type", "tag") %}
+  {% set value = {"cuisine": cuisine, "meal_type": meal_type, "tag": tag}[name] %}
+  {% if value %}<input type="hidden" name="{{ name }}" value="{{ value }}" data-catalog-state>{% endif %}
+{% endfor %}
+
+{% if facets.cuisine %}
+<section class="filters" aria-label="סינון">
+  <div class="chip-row" role="group" aria-label="מטבח">
+    <span class="chip-label">מטבח</span>
+    {{ filter_link(catalog_url(q=q, meal_type=meal_type, tag=tag), "הכל", not cuisine) }}
+    {% for value, count in facets.cuisine.items() %}
+      {% set url = catalog_url(q=q, cuisine=(None if value == cuisine else value), meal_type=meal_type, tag=tag) %}
+      {{ filter_link(url, value ~ " · " ~ count, value == cuisine) }}
+    {% endfor %}
+  </div>
+  <div class="chip-row" role="group" aria-label="סוג מנה">
+    <span class="chip-label">סוג מנה</span>
+    {{ filter_link(catalog_url(q=q, cuisine=cuisine, tag=tag), "הכל", not meal_type) }}
+    {% for value, count in facets.meal_type.items() %}
+      {% set url = catalog_url(q=q, cuisine=cuisine, meal_type=(None if value == meal_type else value), tag=tag) %}
+      {{ filter_link(url, value ~ " · " ~ count, value == meal_type) }}
+    {% endfor %}
+  </div>
+  {% if tag %}
+  <div class="chip-row">
+    <span class="chip-label">תגית</span>
+    {{ filter_link(catalog_url(q=q, cuisine=cuisine, meal_type=meal_type), "#" ~ tag ~ " ✕", true) }}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if recipes %}
+<p class="result-count">{{ recipes|length }} מתכונים</p>
+<ul class="cards">
+  {% for r in recipes %}
+  <li class="card">
+    <h2 class="card-title"><a href="/recipes/{{ r.id }}">{{ r.title }}</a></h2>
+    <p class="meta">
+      <span>{{ r.cuisine }}</span>
+      <span>{{ r.meal_type }}</span>
+      {% set total = total_minutes(r) %}
+      {% if total %}<span>⏱ {{ total|minutes }}</span>{% endif %}
+    </p>
+    {% if r.tags %}
+    <p class="tags">
+      {% for t in r.tags %}{{ filter_link(catalog_url(q=q, cuisine=cuisine, meal_type=meal_type, tag=t), "#" ~ t, t == tag, "tag") }} {% endfor %}
+    </p>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% elif filtered %}
+<div class="empty">
+  <p>לא נמצאו מתכונים מתאימים.</p>
+  <p><a href="/">ניקוי החיפוש והסינון</a></p>
+</div>
+{% else %}
+<div class="empty">
+  <p>עדיין אין כאן מתכונים.</p>
+  <p><a class="button button-primary" href="/new">הוסיפו את המתכון הראשון</a></p>
+</div>
+{% endif %}

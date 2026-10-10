@@ -32,13 +32,19 @@ CREATE INDEX IF NOT EXISTS idx_recipes_cuisine ON recipes(cuisine);
 CREATE INDEX IF NOT EXISTS idx_recipes_meal_type ON recipes(meal_type);
 CREATE INDEX IF NOT EXISTS idx_recipes_created ON recipes(created_at);
 
--- Standalone FTS table; rowid mirrors recipes.id. Kept in sync explicitly by
--- the Repository because the ingredients text is derived from JSON.
+"""
+
+# Standalone FTS table; rowid mirrors recipes.id. Kept in sync explicitly by
+# the Repository because the ingredients text is derived from JSON. The trigram
+# tokenizer gives substring matching, which Hebrew needs: prefix letters attach
+# to words, so "חומוס" must also match "החומוס" and "וחומוס".
+FTS_SCHEMA = """
 CREATE VIRTUAL TABLE IF NOT EXISTS recipes_fts USING fts5(
     title, description, ingredients, tags,
-    tokenize = 'unicode61 remove_diacritics 2'
+    tokenize = 'trigram'
 );
 """
+FTS_COLUMNS = ("title", "description", "ingredients", "tags")
 
 # Columns written from a RecipeDraft, in a fixed order.
 _DRAFT_COLUMNS = (
@@ -69,18 +75,32 @@ def _fts_values(draft: RecipeDraft) -> tuple[str, str, str, str]:
     )
 
 
-def fts_query(text: str) -> str | None:
-    """Turn raw user input into a safe FTS5 query.
+def search_clause(text: str) -> tuple[str, list[str]] | None:
+    """Turn raw user input into a safe SQL condition over `recipes_fts`.
 
-    Each whitespace-separated term becomes a quoted prefix phrase, so FTS5
-    operators and punctuation (`"`, `*`, `OR`, `-`, ...) are treated as plain
-    text. Terms are implicitly ANDed. Returns None if there is nothing to search.
+    Each whitespace-separated term must appear as a substring (terms are ANDed).
+    Terms of 3+ characters go through the trigram index as quoted FTS5 phrases,
+    so operators and punctuation (`"`, `*`, `OR`, `-`, ...) are plain text.
+    Shorter terms can't be trigram-matched and fall back to an escaped LIKE.
+    Returns None if there is nothing to search.
     """
-    terms = [t.replace('"', '""') for t in text.split()]
-    terms = [t for t in terms if t.strip('"')]
+    terms = text.split()
     if not terms:
         return None
-    return " ".join(f'"{t}"*' for t in terms)
+    long_terms = [t for t in terms if len(t) >= 3]
+    short_terms = [t for t in terms if len(t) < 3]
+    conditions: list[str] = []
+    params: list[str] = []
+    if long_terms:
+        conditions.append("recipes_fts MATCH ?")
+        params.append(" ".join('"{}"'.format(t.replace('"', '""')) for t in long_terms))
+    for term in short_terms:
+        pattern = "%" + term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        conditions.append(
+            "(" + " OR ".join(f"{c} LIKE ? ESCAPE '\\'" for c in FTS_COLUMNS) + ")"
+        )
+        params.extend([pattern] * len(FTS_COLUMNS))
+    return " AND ".join(conditions), params
 
 
 class Repository:
@@ -94,6 +114,7 @@ class Repository:
         self._lock = threading.RLock()
         with self._lock, self._conn:
             self._conn.executescript(SCHEMA)
+            self._ensure_fts()
 
     def close(self) -> None:
         self._conn.close()
@@ -169,9 +190,10 @@ class Repository:
         if tag:
             where.append("EXISTS (SELECT 1 FROM json_each(r.tags) WHERE value = ?)")
             params.append(tag)
-        if query and (match := fts_query(query)):
-            where.append("r.id IN (SELECT rowid FROM recipes_fts WHERE recipes_fts MATCH ?)")
-            params.append(match)
+        if query and (search := search_clause(query)):
+            condition, search_params = search
+            where.append(f"r.id IN (SELECT rowid FROM recipes_fts WHERE {condition})")
+            params.extend(search_params)
         sql = "SELECT r.* FROM recipes r"
         if where:
             sql += " WHERE " + " AND ".join(where)
@@ -193,6 +215,23 @@ class Repository:
         return result
 
     # --- Helpers ----------------------------------------------------------
+
+    def _ensure_fts(self) -> None:
+        """Create the FTS table, rebuilding it if it predates the trigram tokenizer."""
+        row = self._conn.execute(
+            "SELECT sql FROM sqlite_master WHERE name = 'recipes_fts'"
+        ).fetchone()
+        if row is not None and "trigram" in row["sql"]:
+            return
+        self._conn.execute("DROP TABLE IF EXISTS recipes_fts")
+        self._conn.executescript(FTS_SCHEMA)
+        for recipe_row in self._conn.execute("SELECT * FROM recipes").fetchall():
+            recipe = self._to_recipe(recipe_row)
+            self._conn.execute(
+                "INSERT INTO recipes_fts (rowid, title, description, ingredients, tags) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (recipe.id, *_fts_values(recipe)),
+            )
 
     @staticmethod
     def _to_recipe(row: sqlite3.Row) -> Recipe:

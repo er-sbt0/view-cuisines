@@ -1,0 +1,16 @@
+<h1>מתכון חדש</h1>
+<p class="lead">הדביקו כאן מתכון מכל מקור — בלוג, אינסטגרם, הודעה מחברים. נסדר אותו בעברית, ביחידות מטריות, ותוכלו לבדוק לפני השמירה.</p>
+{% if error %}<div class="alert" role="alert">{{ error }}</div>{% endif %}
+<form class="paste-form" method="post" action="/extract"
+      hx-post="/extract" hx-target="#work" hx-indicator="#extract-spinner"
+      hx-disabled-elt="find button">
+  <label class="visually-hidden" for="raw_text">טקסט המתכון</label>
+  <textarea id="raw_text" name="raw_text" rows="16" required
+            placeholder="הדביקו את המתכון כאן…">{{ raw_text }}</textarea>
+  <div class="form-actions">
+    <button type="submit" class="button button-primary">עבד מתכון</button>
+    <span id="extract-spinner" class="htmx-indicator spinner-wrap" aria-live="polite">
+      <span class="spinner" aria-hidden="true"></span> מעבד את המתכון… זה לוקח כמה שניות
+    </span>
+  </div>
+</form>

@@ -1,0 +1,7 @@
+<div class="ingredient-row">
+  <input name="ing_quantity" value="{{ ing.quantity|num if ing else '' }}" inputmode="decimal" placeholder="כמות" aria-label="כמות">
+  <input name="ing_unit" value="{{ ing.unit or '' if ing else '' }}" placeholder="יחידה" aria-label="יחידה">
+  <input name="ing_item" value="{{ ing.item if ing else '' }}" placeholder="מרכיב" aria-label="מרכיב">
+  <input name="ing_note" value="{{ ing.note or '' if ing else '' }}" placeholder="הערה" aria-label="הערה">
+  <button type="button" class="icon-button" data-remove-row aria-label="הסרת שורה" title="הסרת שורה">✕</button>
+</div>
